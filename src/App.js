@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -18,9 +18,10 @@ const App = () => {
     <Box display="flex">
       {token && !isAuthPage && <Sidebar />}
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 0 }}>
         <Routes>
-          {/* <Route path="/" element={<Dashboard />} /> */}
+          <Route path="/" element={<Navigate to="/logs" replace />} />
+
           <Route path="/dashboard" element={<Analytics />} />
           <Route path="/logs" element={<Logs />} />
           {/* <Route path="/settings" element={<Settings />} /> */}

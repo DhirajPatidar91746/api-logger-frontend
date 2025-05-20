@@ -9,7 +9,8 @@ import {
   TableRow,
   TablePagination,
   TableSortLabel,
-  Typography
+  Typography,
+  CircularProgress,
 } from '@mui/material';
 import API from '../services/api';
 import Topbar from '../components/Topbar';
@@ -24,8 +25,10 @@ const Logs = () => {
   const [sortOrder, setSortOrder] = useState('desc');
   const [filters, setFilters] = useState({});
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const fetchLogs = async () => {
+    setLoading(true);
     try {
       const params = {
         page: page + 1,
@@ -39,6 +42,8 @@ const Logs = () => {
       setTotal(res?.data?.total || 0);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,7 +51,7 @@ const Logs = () => {
     if (!localStorage.getItem('token')) {
       navigate('/login');
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     fetchLogs();
@@ -63,78 +68,87 @@ const Logs = () => {
     setPage(0);
   };
 
-  // Export current filtered logs to JSON file
   const exportJson = () => {
-    if (!logs || logs.length === 0) {
+    if (!logs.length) {
       alert('No data to export!');
       return;
     }
-    const filename = 'logs_export.json';
-    const jsonStr = JSON.stringify(logs, null, 2);
-
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const href = URL.createObjectURL(blob);
-
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = href;
-    link.download = filename;
-    document.body.appendChild(link);
+    link.download = 'logs_export.json';
+    link.href = url;
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(href);
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-        API Logs
+    <Box sx={{ mt: '64px', px: 3, pb: 3 }}>
+      <Topbar
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onExportJson={exportJson}
+      />
+
+      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
+        test
       </Typography>
+      <Paper elevation={2} sx={{ mt: 2, overflow: 'hidden' }}>
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" p={4}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ maxHeight: 500, overflowY: 'auto' }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {['endpoint', 'method', 'statusCode', 'responseTime', 'timestamp'].map((field) => (
+                      <TableCell
+                        key={field}
+                        sx={{
+                          fontWeight: 600,
+                          textTransform: 'capitalize',
+                          backgroundColor: '#f5f5f5',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 1,
+                        }}
+                      >
+                        {field}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
 
-      <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-        <Topbar filters={filters} onFilterChange={handleFilterChange} onExportJson={exportJson} />
-      </Paper>
+                <TableBody>
+                  {logs.map((log, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{log.endpoint}</TableCell>
+                      <TableCell>{log.method}</TableCell>
+                      <TableCell>{log.statusCode}</TableCell>
+                      <TableCell>{log.responseTime} ms</TableCell>
+                      <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
 
-      <Paper elevation={3}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              {['endpoint', 'method', 'statusCode', 'responseTime', 'timestamp'].map((field) => (
-                <TableCell key={field} sx={{ fontWeight: 600 }}>
-                  <TableSortLabel
-                    active={sortBy === field}
-                    direction={sortBy === field ? sortOrder : 'asc'}
-                    onClick={() => handleSort(field)}
-                  >
-                    {field}
-                  </TableSortLabel>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {logs.map((log, index) => (
-              <TableRow key={index}>
-                <TableCell>{log.endpoint}</TableCell>
-                <TableCell>{log.method}</TableCell>
-                <TableCell>{log.statusCode}</TableCell>
-                <TableCell>{log.responseTime} ms</TableCell>
-                <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-
-        <TablePagination
-          component="div"
-          count={total}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-        />
+            <TablePagination
+              component="div"
+              count={total}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </>
+        )}
       </Paper>
     </Box>
   );

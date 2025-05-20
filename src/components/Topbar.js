@@ -1,15 +1,44 @@
 import React from 'react';
-import { AppBar, Toolbar, TextField, MenuItem,Button } from '@mui/material';
+import {
+  AppBar,
+  Toolbar,
+  TextField,
+  MenuItem,
+  Button,
+  useTheme,
+  useMediaQuery,
+  Box,
+} from '@mui/material';
 
 const methods = ['GET', 'POST', 'PUT', 'DELETE'];
 const statusCodes = [200, 201, 400, 404, 500];
 
-const Topbar = ({ filters = {}, onFilterChange,onExportJson}) => {
+const Topbar = ({ filters = {}, onFilterChange, onExportJson }) => {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
-    <AppBar position="static" color="default" sx={{ boxShadow: 'none' }}>
-      <Toolbar sx={{ gap: 2, flexWrap: 'wrap' }}>
+    <AppBar
+      position="fixed"
+      elevation={0}
+      sx={{
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+        backgroundColor: '#fff',
+        borderBottom: '1px solid #ddd',
+        width: { sm: 'calc(100% - 240px)' },
+        ml: { sm: '240px' },
+      }}
+    >
+      <Toolbar
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 2,
+          py: 2,
+        }}
+      >
         <TextField
-          label="Date From"
+          label="From"
           type="date"
           value={filters.fromDate || ''}
           onChange={(e) => onFilterChange('fromDate', e.target.value)}
@@ -18,7 +47,7 @@ const Topbar = ({ filters = {}, onFilterChange,onExportJson}) => {
           sx={{ width: 130 }}
         />
         <TextField
-          label="Date To"
+          label="To"
           type="date"
           value={filters.toDate || ''}
           onChange={(e) => onFilterChange('toDate', e.target.value)}
@@ -34,8 +63,10 @@ const Topbar = ({ filters = {}, onFilterChange,onExportJson}) => {
           size="small"
           sx={{ width: 130 }}
         >
-          {statusCodes.map(code => (
-            <MenuItem key={code} value={code}>{code}</MenuItem>
+          {statusCodes.map((code) => (
+            <MenuItem key={code} value={code}>
+              {code}
+            </MenuItem>
           ))}
         </TextField>
         <TextField
@@ -46,8 +77,10 @@ const Topbar = ({ filters = {}, onFilterChange,onExportJson}) => {
           size="small"
           sx={{ width: 130 }}
         >
-          {methods.map(method => (
-            <MenuItem key={method} value={method}>{method}</MenuItem>
+          {methods.map((method) => (
+            <MenuItem key={method} value={method}>
+              {method}
+            </MenuItem>
           ))}
         </TextField>
         <TextField
@@ -55,8 +88,9 @@ const Topbar = ({ filters = {}, onFilterChange,onExportJson}) => {
           value={filters.endpoint || ''}
           onChange={(e) => onFilterChange('endpoint', e.target.value)}
           size="small"
-          sx={{ width: 130 }}
+          sx={{ width: 160 }}
         />
+        <Box sx={{ flexGrow: 1 }} />
         <Button variant="contained" onClick={onExportJson}>
           Export JSON
         </Button>
