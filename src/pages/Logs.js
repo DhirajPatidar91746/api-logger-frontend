@@ -8,9 +8,12 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  TableSortLabel,
   Typography,
   CircularProgress,
+  LinearProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent
 } from '@mui/material';
 import API from '../services/api';
 import Topbar from '../components/Topbar';
@@ -21,8 +24,8 @@ const Logs = () => {
   const [logs, setLogs] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [sortBy, setSortBy] = useState('timestamp');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [exportProgress, setExportProgress] = useState(0);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const [filters, setFilters] = useState({});
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -33,8 +36,6 @@ const Logs = () => {
       const params = {
         page: page + 1,
         limit: rowsPerPage,
-        sortBy,
-        sortOrder,
         ...filters,
       };
       const res = await API.get('/logs', { params });
@@ -55,102 +56,149 @@ const Logs = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [page, rowsPerPage, sortBy, sortOrder, filters]);
-
-  const handleSort = (field) => {
-    const isAsc = sortBy === field && sortOrder === 'asc';
-    setSortBy(field);
-    setSortOrder(isAsc ? 'desc' : 'asc');
-  };
+  }, [page, rowsPerPage, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(0);
   };
 
-  const exportJson = () => {
-    if (!logs.length) {
-      alert('No data to export!');
-      return;
+  const exportJson = async () => {
+    try {
+      setProgressDialogOpen(true);
+      setExportProgress(0);
+
+      const startRes = await API.get('/export-json/start', { params: filters });
+      const jobId = startRes.data.jobId;
+
+      const intervalId = setInterval(async () => {
+        try {
+          const statusRes = await API.get('/export-json/status', { params: { jobId } });
+          const { progress, status } = statusRes.data;
+
+          setExportProgress(progress);
+
+          if (status === 'completed') {
+            clearInterval(intervalId);
+
+            const res = await API.get('/export-json/download', {
+              params: { jobId },
+              responseType: 'blob',
+            });
+
+            const blob = new Blob([res.data], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'logs_export.json');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            setProgressDialogOpen(false);
+          }
+
+          if (status === 'error') {
+            clearInterval(intervalId);
+            alert('Export job failed.');
+            setProgressDialogOpen(false);
+          }
+        } catch (pollErr) {
+          clearInterval(intervalId);
+          console.error('Polling failed:', pollErr);
+          alert('Failed to track export progress.');
+          setProgressDialogOpen(false);
+        }
+      }, 1000);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to start export.');
+      setProgressDialogOpen(false);
     }
-    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = 'logs_export.json';
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
-    <Box sx={{ mt: '64px', px: 3, pb: 3 }}>
-      <Topbar
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onExportJson={exportJson}
-      />
-
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
-        test
-      </Typography>
-      <Paper elevation={2} sx={{ mt: 2, overflow: 'hidden' }}>
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" p={4}>
-            <CircularProgress />
+    <>
+      <Dialog open={progressDialogOpen}>
+        <DialogTitle>Exporting Logs</DialogTitle>
+        <DialogContent>
+          <Box sx={{ width: 300, mt: 1 }}>
+            <Typography variant="body2">Progress: {exportProgress}%</Typography>
+            <LinearProgress variant="determinate" value={exportProgress} />
           </Box>
-        ) : (
-          <>
-            <Box sx={{ maxHeight: 500, overflowY: 'auto' }}>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {['endpoint', 'method', 'statusCode', 'responseTime', 'timestamp'].map((field) => (
-                      <TableCell
-                        key={field}
-                        sx={{
-                          fontWeight: 600,
-                          textTransform: 'capitalize',
-                          backgroundColor: '#f5f5f5',
-                          position: 'sticky',
-                          top: 0,
-                          zIndex: 1,
-                        }}
-                      >
-                        {field}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
+        </DialogContent>
+      </Dialog>
 
-                <TableBody>
-                  {logs.map((log, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{log.endpoint}</TableCell>
-                      <TableCell>{log.method}</TableCell>
-                      <TableCell>{log.statusCode}</TableCell>
-                      <TableCell>{log.responseTime} ms</TableCell>
-                      <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <Box sx={{ mt: '64px', px: 3, pb: 3 }}>
+        <Topbar
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onExportJson={exportJson}
+        />
+
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
+          test
+        </Typography>
+        <Paper elevation={2} sx={{ mt: 2, overflow: 'hidden' }}>
+          {loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" p={4}>
+              <CircularProgress />
             </Box>
+          ) : (
+            <>
+              <Box sx={{ maxHeight: 500, overflowY: 'auto' }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      {['endpoint', 'method', 'statusCode', 'responseTime', 'timestamp'].map((field) => (
+                        <TableCell
+                          key={field}
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: 'capitalize',
+                            backgroundColor: '#f5f5f5',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 1,
+                          }}
+                        >
+                          {field}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
 
-            <TablePagination
-              component="div"
-              count={total}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-            />
-          </>
-        )}
-      </Paper>
-    </Box>
+                  <TableBody>
+                    {logs.map((log, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{log.endpoint}</TableCell>
+                        <TableCell>{log.method}</TableCell>
+                        <TableCell>{log.statusCode}</TableCell>
+                        <TableCell>{log.responseTime} ms</TableCell>
+                        <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              <TablePagination
+                component="div"
+                count={total}
+                page={page}
+                onPageChange={(e, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+              />
+            </>
+          )}
+        </Paper>
+      </Box>
+    </>
   );
 };
 
