@@ -13,7 +13,7 @@ import {
 const methods = ['GET', 'POST', 'PUT', 'DELETE'];
 const statusCodes = [200, 201, 400, 404, 500];
 
-const Topbar = ({ filters = {}, onFilterChange, onExportJson }) => {
+const Topbar = ({ filters = {}, onFilterChange, onExportJson ,onExportJsonS3}) => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -93,6 +93,9 @@ const Topbar = ({ filters = {}, onFilterChange, onExportJson }) => {
         <Box sx={{ flexGrow: 1 }} />
         <Button variant="contained" onClick={onExportJson}>
           Export JSON
+        </Button>
+        <Button variant="contained" onClick={onExportJsonS3}>
+          Export JSON To S3
         </Button>
       </Toolbar>
     </AppBar>

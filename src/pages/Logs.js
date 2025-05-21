@@ -80,6 +80,9 @@ const Logs = () => {
           const statusRes = await API.get('/export-json/status', { params: { jobId } });
           const { progress, status } = statusRes.data;
 
+          console.log(progress, "process")
+          console.log(status, "status")
+
           setExportProgress(progress);
 
           if (status === 'completed') {
@@ -125,6 +128,14 @@ const Logs = () => {
     }
   };
 
+  const exportJsonToS3 = async () => {
+    try {
+      const startRes = await API.get('/export-json/s3', { params: filters });
+    } catch (error) {
+      
+    }
+  }
+
   const handleCloseExport = () => {
     if (intervalIdRef.current) {
       clearInterval(intervalIdRef.current);
@@ -154,7 +165,12 @@ const Logs = () => {
       </Dialog>
 
       <Box sx={{ mt: '64px', px: 3, pb: 3 }}>
-        <Topbar filters={filters} onFilterChange={handleFilterChange} onExportJson={exportJson} />
+        <Topbar
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onExportJson={exportJson}
+          onExportJsonS3={exportJsonToS3}
+        />
 
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
           test
