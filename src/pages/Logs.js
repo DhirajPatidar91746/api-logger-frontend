@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -13,8 +13,10 @@ import {
   LinearProgress,
   Dialog,
   DialogTitle,
-  DialogContent
+  DialogContent,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import API from '../services/api';
 import Topbar from '../components/Topbar';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +31,8 @@ const Logs = () => {
   const [filters, setFilters] = useState({});
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const intervalIdRef = useRef(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -71,7 +75,7 @@ const Logs = () => {
       const startRes = await API.get('/export-json/start', { params: filters });
       const jobId = startRes.data.jobId;
 
-      const intervalId = setInterval(async () => {
+      intervalIdRef.current = setInterval(async () => {
         try {
           const statusRes = await API.get('/export-json/status', { params: { jobId } });
           const { progress, status } = statusRes.data;
@@ -79,7 +83,8 @@ const Logs = () => {
           setExportProgress(progress);
 
           if (status === 'completed') {
-            clearInterval(intervalId);
+            clearInterval(intervalIdRef.current);
+            intervalIdRef.current = null;
 
             const res = await API.get('/export-json/download', {
               params: { jobId },
@@ -100,12 +105,14 @@ const Logs = () => {
           }
 
           if (status === 'error') {
-            clearInterval(intervalId);
+            clearInterval(intervalIdRef.current);
+            intervalIdRef.current = null;
             alert('Export job failed.');
             setProgressDialogOpen(false);
           }
         } catch (pollErr) {
-          clearInterval(intervalId);
+          clearInterval(intervalIdRef.current);
+          intervalIdRef.current = null;
           console.error('Polling failed:', pollErr);
           alert('Failed to track export progress.');
           setProgressDialogOpen(false);
@@ -118,10 +125,26 @@ const Logs = () => {
     }
   };
 
+  const handleCloseExport = () => {
+    if (intervalIdRef.current) {
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+    setProgressDialogOpen(false);
+    setExportProgress(0);
+  };
+
   return (
     <>
       <Dialog open={progressDialogOpen}>
-        <DialogTitle>Exporting Logs</DialogTitle>
+        <DialogTitle
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          Exporting Logs
+          <IconButton aria-label="close" onClick={handleCloseExport} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ width: 300, mt: 1 }}>
             <Typography variant="body2">Progress: {exportProgress}%</Typography>
@@ -131,11 +154,7 @@ const Logs = () => {
       </Dialog>
 
       <Box sx={{ mt: '64px', px: 3, pb: 3 }}>
-        <Topbar
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onExportJson={exportJson}
-        />
+        <Topbar filters={filters} onFilterChange={handleFilterChange} onExportJson={exportJson} />
 
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
           test

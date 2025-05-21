@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Paper,
+  Typography,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from '@mui/material';
 import { Line, Bar, Pie } from 'react-chartjs-2';
 import API from '../services/api';
 import {
@@ -32,17 +41,18 @@ const Analytics = () => {
   const [avgResponseTime, setAvgResponseTime] = useState(null);
   const [statusCodeBreakdown, setStatusCodeBreakdown] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lineChartLoading, setLineChartLoading] = useState(true);
+  const [requestType, setRequestType] = useState('day'); // default grouping
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchAllAnalytics = async () => {
+      setLoading(true);
       try {
-        const [reqDayRes, avgRespRes, statusCodeRes] = await Promise.all([
-          API.get('/analytics/requests-per-day'),
+        const [avgRespRes, statusCodeRes] = await Promise.all([
           API.get('/analytics/avg-response-time'),
-          API.get('/analytics/status-code-breakdown'),
+          API.get('/analytics/status-code-breakdown')
         ]);
 
-        setRequestsPerDay(reqDayRes.data);
         setAvgResponseTime(avgRespRes.data);
         setStatusCodeBreakdown(statusCodeRes.data);
       } catch (err) {
@@ -52,17 +62,28 @@ const Analytics = () => {
       }
     };
 
-    fetchAnalytics();
+    fetchAllAnalytics();
   }, []);
+
+  useEffect(() => {
+    const fetchLineChartData = async () => {
+      setLineChartLoading(true);
+      try {
+        const reqDayRes = await API.get(`/analytics/requests-per-day?type=${requestType}`);
+        setRequestsPerDay(reqDayRes.data);
+      } catch (err) {
+        console.error('Failed to fetch line chart data', err);
+      } finally {
+        setLineChartLoading(false);
+      }
+    };
+
+    fetchLineChartData();
+  }, [requestType]);
 
   if (loading)
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="60vh"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
         <CircularProgress />
       </Box>
     );
@@ -74,7 +95,7 @@ const Analytics = () => {
     labels: requestsPerDay.map(item => item._id),
     datasets: [
       {
-        label: 'Requests per Day',
+        label: `Requests per ${requestType.charAt(0).toUpperCase() + requestType.slice(1)}`,
         data: requestsPerDay.map(item => item.count),
         borderColor: 'blue',
         backgroundColor: 'rgba(0, 0, 255, 0.2)',
@@ -106,21 +127,47 @@ const Analytics = () => {
   };
 
   return (
-    <Box display="flex" gap={2} justifyContent="space-between" flexWrap="wrap">
-      <Paper elevation={3} sx={{ width: '32%', padding: 2 }}>
-        <Typography variant="h6" align="center">Avg Response Time</Typography>
-        <Bar data={barData} />
+    <Box display="flex" gap={2} flexDirection="column" padding={2}>
+      {/* Select Filter */}
+      <FormControl sx={{ width: 200 }}>
+        <InputLabel>Group By</InputLabel>
+        <Select
+          value={requestType}
+          label="Group By"
+          onChange={(e) => setRequestType(e.target.value)}
+        >
+          <MenuItem value="day">Day</MenuItem>
+          <MenuItem value="week">Week</MenuItem>
+          <MenuItem value="month">Month</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Charts */}
+
+      <Paper elevation={3} sx={{ width: '95%', padding: 2 }}>
+        <Typography variant="h6" align="center">
+          Requests Per {requestType.charAt(0).toUpperCase() + requestType.slice(1)}
+        </Typography>
+        {lineChartLoading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Line data={lineData} />
+        )}
       </Paper>
 
-      <Paper elevation={3} sx={{ width: '32%', padding: 2 }}>
-        <Typography variant="h6" align="center">Status Code Breakdown</Typography>
-        <Pie data={pieData} />
-      </Paper>
+      <Box display="flex" gap={2} justifyContent="space-between" flexWrap="wrap">
+        <Paper elevation={3} sx={{ width: '32%', padding: 2 }}>
+          <Typography variant="h6" align="center">Avg Response Time</Typography>
+          <Bar data={barData} />
+        </Paper>
 
-      <Paper elevation={3} sx={{ width: '70%', padding: 2 }}>
-        <Typography variant="h6" align="center">Requests Per Day</Typography>
-        <Line data={lineData} />
-      </Paper>
+        <Paper elevation={3} sx={{ width: '32%', padding: 2 }}>
+          <Typography variant="h6" align="center">Status Code Breakdown</Typography>
+          <Pie data={pieData} />
+        </Paper>
+      </Box>
     </Box>
   );
 };
