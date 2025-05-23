@@ -31,8 +31,16 @@ const Logs = () => {
   const [filters, setFilters] = useState({});
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [s3DownloadUrl, setS3DownloadUrl] = useState(null);
 
   const intervalIdRef = useRef(null);
+
+  const clearPollingInterval = () => {
+    if (intervalIdRef.current) {
+      clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+  };
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -62,15 +70,24 @@ const Logs = () => {
     fetchLogs();
   }, [page, rowsPerPage, filters]);
 
+  useEffect(() => {
+    return () => {
+      clearPollingInterval();
+    };
+  }, []);
+
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(0);
+    setS3DownloadUrl(null);
   };
 
   const exportJson = async () => {
     try {
+      clearPollingInterval();
       setProgressDialogOpen(true);
       setExportProgress(0);
+      setS3DownloadUrl(null);
 
       const startRes = await API.get('/export-json/start', { params: filters });
       const jobId = startRes.data.jobId;
@@ -80,14 +97,10 @@ const Logs = () => {
           const statusRes = await API.get('/export-json/status', { params: { jobId } });
           const { progress, status } = statusRes.data;
 
-          console.log(progress, "process")
-          console.log(status, "status")
-
           setExportProgress(progress);
 
           if (status === 'completed') {
-            clearInterval(intervalIdRef.current);
-            intervalIdRef.current = null;
+            clearPollingInterval();
 
             const res = await API.get('/export-json/download', {
               params: { jobId },
@@ -105,23 +118,20 @@ const Logs = () => {
             window.URL.revokeObjectURL(url);
 
             setProgressDialogOpen(false);
-          }
-
-          if (status === 'error') {
-            clearInterval(intervalIdRef.current);
-            intervalIdRef.current = null;
+          } else if (status === 'error') {
+            clearPollingInterval();
             alert('Export job failed.');
             setProgressDialogOpen(false);
           }
         } catch (pollErr) {
-          clearInterval(intervalIdRef.current);
-          intervalIdRef.current = null;
+          clearPollingInterval();
           console.error('Polling failed:', pollErr);
           alert('Failed to track export progress.');
           setProgressDialogOpen(false);
         }
       }, 1000);
     } catch (err) {
+      clearPollingInterval();
       console.error('Export failed:', err);
       alert('Failed to start export.');
       setProgressDialogOpen(false);
@@ -130,19 +140,56 @@ const Logs = () => {
 
   const exportJsonToS3 = async () => {
     try {
-      const startRes = await API.get('/export-json/s3', { params: filters });
-    } catch (error) {
-      
+      clearPollingInterval();
+      setProgressDialogOpen(true);
+      setExportProgress(0);
+      setS3DownloadUrl(null);
+
+      const startRes = await API.get('/export-s3/start', { params: filters });
+      const jobId = startRes.data.jobId;
+
+      intervalIdRef.current = setInterval(async () => {
+        try {
+          const statusRes = await API.get('/export-s3/status', { params: { jobId } });
+          const { progress, status, downloadUrl } = statusRes.data;
+
+          setExportProgress(progress);
+
+          if (status === 'completed' && downloadUrl) {
+            clearPollingInterval();
+            setS3DownloadUrl(downloadUrl);
+            setProgressDialogOpen(false);
+          } else if (status === 'error') {
+            clearPollingInterval();
+            alert('Export job to S3 failed.');
+            setProgressDialogOpen(false);
+          }
+        } catch (pollErr) {
+          clearPollingInterval();
+          console.error('Polling failed:', pollErr);
+          alert('Failed to track export progress.');
+          setProgressDialogOpen(false);
+        }
+      }, 1000);
+    } catch (err) {
+      clearPollingInterval();
+      console.error('Export to S3 failed:', err);
+      alert('Failed to start export.');
+      setProgressDialogOpen(false);
     }
-  }
+  };
 
   const handleCloseExport = () => {
-    if (intervalIdRef.current) {
-      clearInterval(intervalIdRef.current);
-      intervalIdRef.current = null;
-    }
+    clearPollingInterval();
     setProgressDialogOpen(false);
     setExportProgress(0);
+  };
+
+  const openS3Url = () => {
+    if (s3DownloadUrl) {
+      window.open(s3DownloadUrl, '_blank', 'noopener,noreferrer');
+      setS3DownloadUrl(null)
+    }
   };
 
   return (
@@ -170,6 +217,8 @@ const Logs = () => {
           onFilterChange={handleFilterChange}
           onExportJson={exportJson}
           onExportJsonS3={exportJsonToS3}
+          s3DownloadUrl={s3DownloadUrl}
+          onShowJson={openS3Url}
         />
 
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>

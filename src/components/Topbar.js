@@ -13,9 +13,18 @@ import {
 const methods = ['GET', 'POST', 'PUT', 'DELETE'];
 const statusCodes = [200, 201, 400, 404, 500];
 
-const Topbar = ({ filters = {}, onFilterChange, onExportJson ,onExportJsonS3}) => {
+const Topbar = ({
+  filters = {},
+  onFilterChange,
+  onExportJson,
+  onExportJsonS3,
+  s3DownloadUrl,
+  onShowJson,
+}) => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
+
+  console.log(s3DownloadUrl, "s3DownloadUrl")
 
   return (
     <AppBar
@@ -35,6 +44,7 @@ const Topbar = ({ filters = {}, onFilterChange, onExportJson ,onExportJsonS3}) =
           flexWrap: 'wrap',
           gap: 2,
           py: 2,
+          alignItems: 'center',
         }}
       >
         <TextField
@@ -95,8 +105,13 @@ const Topbar = ({ filters = {}, onFilterChange, onExportJson ,onExportJsonS3}) =
           Export JSON
         </Button>
         <Button variant="contained" onClick={onExportJsonS3}>
-          Export JSON To S3
+          Export JSON To Cloud
         </Button>
+        {s3DownloadUrl && (
+          <Button variant="outlined" color="primary" onClick={onShowJson}>
+            Show JSON
+          </Button>
+        )}
       </Toolbar>
     </AppBar>
   );
