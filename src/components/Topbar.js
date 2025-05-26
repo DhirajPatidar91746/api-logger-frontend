@@ -18,13 +18,12 @@ const Topbar = ({
   onFilterChange,
   onExportJson,
   onExportJsonS3,
+  onExportCsv,
   s3DownloadUrl,
   onShowJson,
 }) => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
-
-  console.log(s3DownloadUrl, "s3DownloadUrl")
 
   return (
     <AppBar
@@ -32,10 +31,11 @@ const Topbar = ({
       elevation={0}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        backgroundColor: '#fff',
-        borderBottom: '1px solid #ddd',
+        backgroundColor: theme.palette.background.paper,
+        borderBottom: `1px solid ${theme.palette.divider}`,
         width: { sm: 'calc(100% - 240px)' },
         ml: { sm: '240px' },
+        color: theme.palette.text.primary,
       }}
     >
       <Toolbar
@@ -55,6 +55,8 @@ const Topbar = ({
           InputLabelProps={{ shrink: true }}
           size="small"
           sx={{ width: 130 }}
+          color="primary"
+          variant="outlined"
         />
         <TextField
           label="To"
@@ -64,6 +66,8 @@ const Topbar = ({
           InputLabelProps={{ shrink: true }}
           size="small"
           sx={{ width: 130 }}
+          color="primary"
+          variant="outlined"
         />
         <TextField
           select
@@ -72,6 +76,8 @@ const Topbar = ({
           onChange={(e) => onFilterChange('statusCode', e.target.value)}
           size="small"
           sx={{ width: 130 }}
+          color="primary"
+          variant="outlined"
         >
           {statusCodes.map((code) => (
             <MenuItem key={code} value={code}>
@@ -86,6 +92,8 @@ const Topbar = ({
           onChange={(e) => onFilterChange('method', e.target.value)}
           size="small"
           sx={{ width: 130 }}
+          color="primary"
+          variant="outlined"
         >
           {methods.map((method) => (
             <MenuItem key={method} value={method}>
@@ -99,10 +107,15 @@ const Topbar = ({
           onChange={(e) => onFilterChange('endpoint', e.target.value)}
           size="small"
           sx={{ width: 160 }}
+          color="primary"
+          variant="outlined"
         />
         <Box sx={{ flexGrow: 1 }} />
         <Button variant="contained" onClick={onExportJson}>
           Export JSON
+        </Button>
+        <Button variant="contained" onClick={onExportCsv}>
+          Export CSV
         </Button>
         <Button variant="contained" onClick={onExportJsonS3}>
           Export JSON To Cloud

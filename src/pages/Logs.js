@@ -1,25 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TablePagination,
   Typography,
-  CircularProgress,
-  LinearProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   IconButton,
+  LinearProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import API from '../services/api';
 import Topbar from '../components/Topbar';
+import LogsTable from '../components/LogsTable';
 import { useNavigate } from 'react-router-dom';
+import { CircularProgress } from '@mui/material';
+
 
 const Logs = () => {
   const navigate = useNavigate();
@@ -138,6 +133,62 @@ const Logs = () => {
     }
   };
 
+  const exportCsv = async () => {
+    try {
+      clearPollingInterval();
+      setProgressDialogOpen(true);
+      setExportProgress(0);
+      setS3DownloadUrl(null);
+
+      const startRes = await API.get('/export-csv/start', { params: filters });
+      const jobId = startRes.data.jobId;
+
+      intervalIdRef.current = setInterval(async () => {
+        try {
+          const statusRes = await API.get('/export-csv/status', { params: { jobId } });
+          const { progress, status } = statusRes.data;
+
+          setExportProgress(progress);
+
+          if (status === 'completed') {
+            clearPollingInterval();
+
+            const res = await API.get('/export-csv/download', {
+              params: { jobId },
+              responseType: 'blob',
+            });
+
+            const blob = new Blob([res.data], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'logs_export.csv');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            setProgressDialogOpen(false);
+          } else if (status === 'error') {
+            clearPollingInterval();
+            alert('Export job failed.');
+            setProgressDialogOpen(false);
+          }
+        } catch (pollErr) {
+          clearPollingInterval();
+          console.error('Polling failed:', pollErr);
+          alert('Failed to track export progress.');
+          setProgressDialogOpen(false);
+        }
+      }, 1000);
+    } catch (err) {
+      clearPollingInterval();
+      console.error('Export failed:', err);
+      alert('Failed to start CSV export.');
+      setProgressDialogOpen(false);
+    }
+  };
+
   const exportJsonToS3 = async () => {
     try {
       clearPollingInterval();
@@ -188,9 +239,11 @@ const Logs = () => {
   const openS3Url = () => {
     if (s3DownloadUrl) {
       window.open(s3DownloadUrl, '_blank', 'noopener,noreferrer');
-      setS3DownloadUrl(null)
+      setS3DownloadUrl(null);
     }
   };
+
+  console.log(loading,"loading")
 
   return (
     <>
@@ -217,70 +270,30 @@ const Logs = () => {
           onFilterChange={handleFilterChange}
           onExportJson={exportJson}
           onExportJsonS3={exportJsonToS3}
+          onExportCsv={exportCsv}
           s3DownloadUrl={s3DownloadUrl}
           onShowJson={openS3Url}
         />
 
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mt: 4 }}>
-          test
+          Logs
         </Typography>
-        <Paper elevation={2} sx={{ mt: 2, overflow: 'hidden' }}>
-          {loading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" p={4}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              <Box sx={{ maxHeight: 500, overflowY: 'auto' }}>
-                <Table stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      {['endpoint', 'method', 'statusCode', 'responseTime', 'timestamp'].map((field) => (
-                        <TableCell
-                          key={field}
-                          sx={{
-                            fontWeight: 600,
-                            textTransform: 'capitalize',
-                            backgroundColor: '#f5f5f5',
-                            position: 'sticky',
-                            top: 0,
-                            zIndex: 1,
-                          }}
-                        >
-                          {field}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
 
-                  <TableBody>
-                    {logs.map((log, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{log.endpoint}</TableCell>
-                        <TableCell>{log.method}</TableCell>
-                        <TableCell>{log.statusCode}</TableCell>
-                        <TableCell>{log.responseTime} ms</TableCell>
-                        <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Box>
-
-              <TablePagination
-                component="div"
-                count={total}
-                page={page}
-                onPageChange={(e, newPage) => setPage(newPage)}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => {
-                  setRowsPerPage(parseInt(e.target.value, 10));
-                  setPage(0);
-                }}
-              />
-            </>
-          )}
-        </Paper>
+        {loading ? (
+  <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+    <CircularProgress />
+  </Box>
+) : (
+  <LogsTable
+    logs={logs}
+    loading={loading}
+    page={page}
+    total={total}
+    rowsPerPage={rowsPerPage}
+    setPage={setPage}
+    setRowsPerPage={setRowsPerPage}
+  />
+)}
       </Box>
     </>
   );

@@ -7,10 +7,12 @@ import {
   Box,
   Divider,
   Typography,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
-const Sidebar = () => {
+const Sidebar = ({ darkMode, toggleDarkMode }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -27,8 +29,9 @@ const Sidebar = () => {
         [`& .MuiDrawer-paper`]: {
           width: 240,
           boxSizing: 'border-box',
-          backgroundColor: '#f9f9f9',
-          borderRight: '1px solid #ddd',
+          backgroundColor: 'background.paper',
+          borderRight: '1px solid',
+          borderColor: 'divider',
         },
       }}
     >
@@ -46,6 +49,12 @@ const Sidebar = () => {
               <ListItemText primary="Logs" />
             </ListItemButton>
           </List>
+          <Box sx={{ px: 2, mt: 2 }}>
+            <FormControlLabel
+              control={<Switch checked={darkMode} onChange={toggleDarkMode} />}
+              label="Dark Mode"
+            />
+          </Box>
         </Box>
 
         <Box mt="auto">
